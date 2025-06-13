@@ -193,7 +193,7 @@ export const initializeSocket = (server) => {
         // Start Auction event.
         // ... (existing auction logic remains the same) ...
         socket.on("startAuction", async ({ streamId, product, timer, auctionType, bidDirection, increment, startingBid, reservedPrice }) => {
-            io.to(streamId).emit("clrScr");
+            io.emit("clrScr");
             console.log("startAuction clicked with stream ID", streamId);
             const uniqueStreamId = `${streamId}_${product}`;
 
@@ -246,7 +246,7 @@ export const initializeSocket = (server) => {
                     await redisClient.set(auctionKey, JSON.stringify(newAuction));
                     console.log("Auction saved in Redis:", newAuction);
 
-                    io.to(streamId).emit("auctionStarted", {
+                    io.emit("auctionStarted", {
                         streamId, product, endsAt, auctionType, increment, startingBid,
                         uniqueStreamId, nextBids: [nextBid1, nextBid2], auctionNumber, reservedPrice,
                     });
@@ -259,7 +259,7 @@ export const initializeSocket = (server) => {
                         }
                         const auction = JSON.parse(auctionData);
                         const remainingTime = Math.max(0, auction.endsAt - Date.now());
-                        io.to(streamId).emit("timerUpdate", { remainingTime, product });
+                        io.emit("timerUpdate", { remainingTime, product });
 
                         if (remainingTime <= 0) {
                             clearInterval(auctionIntervals[uniqueStreamId]);
@@ -285,7 +285,7 @@ export const initializeSocket = (server) => {
                                 show.currentAuction = null; // Clear current auction after it ends
                                 await show.save();
                                 console.log(`🚀 Auction ended for stream ${uniqueStreamId}. Winner: ${auction.highestBidder?.name || "No one"} with bid $${auction.currentHighestBid}`);
-                                io.to(streamId).emit("auctionEnded", {
+                                io.emit("auctionEnded", {
                                     streamId, highestBid: auction.currentHighestBid, highestBidder: auction.highestBidder,
                                     bidderWon: auction.highestBidder, product,
                                 });
@@ -341,7 +341,7 @@ export const initializeSocket = (server) => {
                     }
                     auctions[uniqueStreamId] = newAuction;
                     console.log("Auction saved locally:", newAuction);
-                    io.to(streamId).emit("auctionStarted", {
+                    io.emit("auctionStarted", {
                         streamId, product, endsAt, auctionType, increment, startingBid,
                         uniqueStreamId, nextBids: [nextBid1, nextBid2],
                     });
@@ -352,7 +352,7 @@ export const initializeSocket = (server) => {
                             return;
                         }
                         const remainingTime = Math.max(0, auction.endsAt - Date.now());
-                        io.to(streamId).emit("timerUpdate", { remainingTime, product });
+                        io.emit("timerUpdate", { remainingTime, product });
 
                         if (remainingTime <= 0) {
                             clearInterval(auctionIntervals[uniqueStreamId]);
@@ -379,7 +379,7 @@ export const initializeSocket = (server) => {
                                     show.currentAuction = null; // Clear current auction after it ends
                                     await show.save();
                                     console.log(`🚀 Auction ended for stream ${uniqueStreamId}. Winner: ${auction.highestBidder?.name || "No one"} with bid $${auction.currentHighestBid}`);
-                                    io.to(streamId).emit("auctionEnded", {
+                                    io.emit("auctionEnded", {
                                         streamId, highestBid: auction.currentHighestBid, highestBidder: auction.highestBidder,
                                         bidderWon: auction.highestBidder, product,
                                     });
@@ -427,7 +427,7 @@ export const initializeSocket = (server) => {
                         }
                     }
                     await redisClient.set(auctionKey, JSON.stringify(auction));
-                    io.to(streamId).emit("bidUpdated", {
+                    io.emit("bidUpdated", {
                         streamId, highestBid: auction.currentHighestBid, highestBidder: auction.highestBidder,
                         nextBids: [nextBid1, nextBid2], product: auction.product
                     });
@@ -463,7 +463,7 @@ export const initializeSocket = (server) => {
                         }
                     }
                     await redisClient.set(auctionKey, JSON.stringify(auction));
-                    io.to(streamId).emit("bidUpdated", {
+                    io.emit("bidUpdated", {
                         streamId, highestBid: auction.currentHighestBid, highestBidder: auction.highestBidder,
                         nextBids: [nextBid1, nextBid2], product: auction.product
                     });
@@ -515,7 +515,7 @@ export const initializeSocket = (server) => {
                             auction.endsAt += auction.increment * 1000;
                         }
                     }
-                    io.to(streamId).emit("bidUpdated", {
+                    io.emit("bidUpdated", {
                         streamId, highestBid: auction.currentHighestBid, highestBidder: auction.highestBidder,
                         nextBids: [nextBid1, nextBid2], product: auction.product
                     });
@@ -550,7 +550,7 @@ export const initializeSocket = (server) => {
                             auction.endsAt += auction.increment * 1000;
                         }
                     }
-                    io.to(streamId).emit("bidUpdated", {
+                    io.emit("bidUpdated", {
                         streamId, highestBid: auction.currentHighestBid, highestBidder: auction.highestBidder,
                         nextBids: [nextBid1, nextBid2], product: auction.product
                     });
@@ -580,7 +580,7 @@ export const initializeSocket = (server) => {
         // ... (existing auction logic remains the same) ...
         socket.on("clearAuction", async (streamId, product) => {
             console.log("🟢 Clear Auction clicked for stream:", streamId);
-            io.to(streamId).emit("clrScr");
+            io.emit("clrScr");
             try {
                 const updatedShow = await Show.findOneAndUpdate(
                     { _id: streamId, "auctionProducts.productId": product },
@@ -603,26 +603,24 @@ export const initializeSocket = (server) => {
         });
 
         // --- Start Giveaway event. (Modified to use DB directly for state) ---
-      socket.on('startGiveaway', async ({ streamId, productId, productTitle, followersOnly, productOwnerSellerId }) => {
+ socket.on('startGiveaway', async ({ streamId, productId, productTitle, followersOnly, productOwnerSellerId }) => {
     console.log(`🎉 Host trying to start giveaway for product: ${productTitle} in stream: ${streamId}`);
     try {
-        // Populate productId in giveawayProducts for the .find() method to work correctly
-        const show = await Show.findById(streamId).populate('giveawayProducts.productId');
+        const show = await Show.findById(streamId).lean(); // Use .lean() to get a plain JS object
+
         if (!show) {
             console.error("❌ Show not found:", streamId);
             return;
         }
 
-        // Check if a giveaway is already active for this stream
         if (show.currentGiveaway && show.currentGiveaway.isActive && !show.currentGiveaway.isGiveawayEnded) {
             console.log("⚠️ Another giveaway is already active for this stream. Cannot start a new one.");
             socket.emit('giveawayAlreadyActive', { message: 'Another giveaway is currently active. Please end it first.' });
             return;
         }
 
-        // --- FIX IS HERE: Access p.productId._id.toString() ---
         const productToActivate = show.giveawayProducts.find(
-            p => p.productId && p.productId._id && p.productId._id.toString() === productId // MODIFIED LINE
+            p => p.productId && p.productId.toString() === productId
         );
 
         if (!productToActivate) {
@@ -631,66 +629,67 @@ export const initializeSocket = (server) => {
             return;
         }
 
-        // ... (rest of the startGiveaway logic remains the same) ...
-
-        // Determine the next giveawayNumber
         const currentMaxGiveawayNumber = show.giveawayProducts.reduce((max, g) => Math.max(max, g.giveawayNumber || 0), 0);
         const newGiveawayNumber = currentMaxGiveawayNumber + 1;
 
-        // Create the new active giveaway object from the found product data
         const newActiveGiveaway = {
-            productId: productToActivate.productId._id, // Store ObjectId
+            productId: productToActivate.productId,
             productOwnerSellerId: productToActivate.productOwnerSellerId,
-            streamId: streamId,
-            productTitle: productToActivate.productId?.title || productTitle, // Use product title from populated product if available
+            streamId: streamId, // IMPORTANT: Keep streamId in the payload
+            productTitle: productToActivate.productTitle || productToActivate.productId?.title || productTitle,
             followersOnly: productToActivate.followersOnly || followersOnly,
             isActive: true,
             isGiveawayEnded: false,
-            applicants: [], // Start with empty applicants for the new active giveaway
+            applicants: [],
             winner: null,
             createdAt: new Date(),
             giveawayNumber: newGiveawayNumber,
         };
 
-        // Set the currentGiveaway field in the show document
-        show.currentGiveaway = newActiveGiveaway;
-
-        // Update the status of this specific product within the `giveawayProducts` array
-        const indexInGiveawayProducts = show.giveawayProducts.findIndex(
-            p => p.productId && p.productId._id && p.productId._id.toString() === productId // MODIFIED LINE
+        await Show.findByIdAndUpdate(
+            streamId,
+            { $set: { currentGiveaway: newActiveGiveaway } },
+            { new: true, runValidators: true, context: 'query' }
         );
-        if (indexInGiveawayProducts !== -1) {
-            Object.assign(show.giveawayProducts[indexInGiveawayProducts], {
-                isActive: true,
-                isGiveawayEnded: false,
-                applicants: [], // Reset applicants for this specific entry in the array
-                winner: null,
-                createdAt: newActiveGiveaway.createdAt, // Update creation time to when it started
-                giveawayNumber: newGiveawayNumber, // Ensure giveawayNumber is set
-            });
-        } else {
-            // This case should ideally not happen if productToActivate was found,
-            // but as a fallback, add it if somehow missing.
-            show.giveawayProducts.push(newActiveGiveaway);
+        await Show.updateOne(
+            { _id: streamId, "giveawayProducts.productId": productToActivate.productId },
+            {
+                $set: {
+                    "giveawayProducts.$.isActive": true,
+                    "giveawayProducts.$.isGiveawayEnded": false,
+                    "giveawayProducts.$.applicants": [],
+                    "giveawayProducts.$.winner": null,
+                    "giveawayProducts.$.createdAt": newActiveGiveaway.createdAt,
+                    "giveawayProducts.$.giveawayNumber": newActiveGiveaway.giveawayNumber,
+                }
+            }
+        );
+
+        const latestShow = await Show.findById(streamId).populate('currentGiveaway.productId');
+
+        if (!latestShow || !latestShow.currentGiveaway) {
+             console.error("❌ Failed to fetch latest show with populated currentGiveaway after starting it.");
+             return;
         }
 
-        await show.save();
-        console.log("✅ Current giveaway set in show successfully:", newActiveGiveaway.productTitle);
+        console.log("✅ Current giveaway set in show successfully:", latestShow.currentGiveaway.productTitle);
 
-        // Update local in-memory cache
-        currentGiveawayByStream[streamId] = {
-            ...newActiveGiveaway,
-            productId: productToActivate.productId // Keep populated product for emit
-        };
+        currentGiveawayByStream[streamId] = latestShow.currentGiveaway.toObject();
+        currentGiveawayByStream[streamId].productId = latestShow.currentGiveaway.productId;
 
-        // Emit to all clients in the room that a giveaway has started
-        io.emit('giveawayStarted', currentGiveawayByStream[streamId]);
+        // Changed to io.emit
+        io.emit('giveawayStarted', currentGiveawayByStream[streamId]); 
 
     } catch (error) {
-        console.error("❌ Error starting giveaway:", error);
-        socket.emit('giveawayError', { message: `Error starting giveaway: ${error.message}` });
+        console.error("❌ Error starting giveaway:", error.message, error.stack);
+        if (error.name === 'VersionError') {
+            socket.emit('giveawayError', { message: 'Failed to start giveaway due to a conflict. Please try again.' });
+        } else {
+            socket.emit('giveawayError', { message: `Error starting giveaway: ${error.message}` });
+        }
     }
 });
+
 
 
         // --- Apply for Giveaway event. (Modified to use DB directly for state) ---
@@ -837,7 +836,7 @@ export const initializeSocket = (server) => {
 
         const applicants = activeGiveaway.applicants;
         if (applicants.length === 0) {
-            io.to(streamId).emit('noApplicants', { productId });
+            io.emit('noApplicants', { productId });
             socket.emit('giveawayRollRejected', { message: 'No applicants for this giveaway yet.' });
             return;
         }
