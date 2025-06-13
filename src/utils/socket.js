@@ -76,7 +76,8 @@ export const initializeSocket = (server) => {
                 "wss://flykup-dk4mv4s6.livekit.cloud",
                 "https://app.flykup.live",
                 "https://admin.flykup.live",
-                "https://flykup-bidding.vercel.app"
+                "https://flykup-bidding.vercel.app",
+                 "https://flykup-fe-merged-live-demo.vercel.app"
             ],
             credentials: true,
             methods: ["GET", "POST", "PUT"],

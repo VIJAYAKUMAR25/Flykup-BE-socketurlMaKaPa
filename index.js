@@ -48,7 +48,8 @@ app.use(cors({
     "https://app.flykup.live",
     "https://admin.flykup.live",
     "https://flykup-bidding.vercel.app",
-    "https://flykup-merge.vercel.app"
+    "https://flykup-merge.vercel.app",
+    "https://flykup-fe-merged-live-demo.vercel.app"
   ],
   credentials: true,
   methods: ["GET", "POST", "PUT"],
