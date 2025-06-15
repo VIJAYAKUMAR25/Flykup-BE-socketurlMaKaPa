@@ -77,7 +77,7 @@ export const initializeSocket = (server) => {
                 "https://app.flykup.live",
                 "https://admin.flykup.live",
                 "https://flykup-bidding.vercel.app",
-                 "https://flykup-fe-merged-live-demo.vercel.app"
+                "https://flykup-fe-merged-live-demo.vercel.app"
             ],
             credentials: true,
             methods: ["GET", "POST", "PUT"],
@@ -376,7 +376,7 @@ export const initializeSocket = (server) => {
                                     show.auctionProducts[index].currentHighestBid = auction.currentHighestBid;
                                     show.auctionProducts[index].highestBidder = auction.highestBidder;
                                     show.auctionProducts[index].bidderWon = auction.highestBidder;
-                                    show.currentAuction = null; // Clear current auction after it ends
+                                    show.currentAuction = null; 
                                     await show.save();
                                     console.log(`🚀 Auction ended for stream ${uniqueStreamId}. Winner: ${auction.highestBidder?.name || "No one"} with bid $${auction.currentHighestBid}`);
                                     io.emit("auctionEnded", {
@@ -603,100 +603,100 @@ export const initializeSocket = (server) => {
         });
 
         // --- Start Giveaway event. (Modified to use DB directly for state) ---
- socket.on('startGiveaway', async ({ streamId, productId, productTitle, followersOnly, productOwnerSellerId }) => {
-    console.log(`🎉 Host trying to start giveaway for product: ${productTitle} in stream: ${streamId}`);
-    try {
-        const show = await Show.findById(streamId).lean(); // Use .lean() to get a plain JS object
+        socket.on('startGiveaway', async ({ streamId, productId, productTitle, followersOnly, productOwnerSellerId }) => {
+            console.log(`🎉 Host trying to start giveaway for product: ${productTitle} in stream: ${streamId}`);
+            try {
+                const show = await Show.findById(streamId).lean(); // Use .lean() to get a plain JS object
 
-        if (!show) {
-            console.error("❌ Show not found:", streamId);
-            return;
-        }
+                if (!show) {
+                    console.error("❌ Show not found:", streamId);
+                    return;
+                }
 
-        if (show.currentGiveaway && show.currentGiveaway.isActive && !show.currentGiveaway.isGiveawayEnded) {
-            console.log("⚠️ Another giveaway is already active for this stream. Cannot start a new one.");
-            socket.emit('giveawayAlreadyActive', { message: 'Another giveaway is currently active. Please end it first.' });
-            return;
-        }
+                if (show.currentGiveaway && show.currentGiveaway.isActive && !show.currentGiveaway.isGiveawayEnded) {
+                    console.log("⚠️ Another giveaway is already active for this stream. Cannot start a new one.");
+                    socket.emit('giveawayAlreadyActive', { message: 'Another giveaway is currently active. Please end it first.' });
+                    return;
+                }
 
-        const productToActivate = show.giveawayProducts.find(
-            p => p.productId && p.productId.toString() === productId
-        );
+                const productToActivate = show.giveawayProducts.find(
+                    p => p.productId && p.productId.toString() === productId
+                );
 
-        if (!productToActivate) {
-            console.error(`❌ Product ${productId} not found in giveawayProducts for show ${streamId}`);
-            socket.emit('giveawayError', { message: 'Giveaway product not found in show\'s list.' });
-            return;
-        }
+                if (!productToActivate) {
+                    console.error(`❌ Product ${productId} not found in giveawayProducts for show ${streamId}`);
+                    socket.emit('giveawayError', { message: 'Giveaway product not found in show\'s list.' });
+                    return;
+                }
 
-        const currentMaxGiveawayNumber = show.giveawayProducts.reduce((max, g) => Math.max(max, g.giveawayNumber || 0), 0);
-        const newGiveawayNumber = currentMaxGiveawayNumber + 1;
+                const currentMaxGiveawayNumber = show.giveawayProducts.reduce((max, g) => Math.max(max, g.giveawayNumber || 0), 0);
+                const newGiveawayNumber = currentMaxGiveawayNumber + 1;
 
-        const newActiveGiveaway = {
-            productId: productToActivate.productId,
-            productOwnerSellerId: productToActivate.productOwnerSellerId,
-            streamId: streamId, // IMPORTANT: Keep streamId in the payload
-            productTitle: productToActivate.productTitle || productToActivate.productId?.title || productTitle,
-            followersOnly: productToActivate.followersOnly || followersOnly,
-            isActive: true,
-            isGiveawayEnded: false,
-            applicants: [],
-            winner: null,
-            createdAt: new Date(),
-            giveawayNumber: newGiveawayNumber,
-        };
+                const newActiveGiveaway = {
+                    productId: productToActivate.productId,
+                    productOwnerSellerId: productToActivate.productOwnerSellerId,
+                    streamId: streamId, // IMPORTANT: Keep streamId in the payload
+                    productTitle: productToActivate.productTitle || productToActivate.productId?.title || productTitle,
+                    followersOnly: productToActivate.followersOnly || followersOnly,
+                    isActive: true,
+                    isGiveawayEnded: false,
+                    isRolling: false, // New field: not rolling yet
+                    applicants: [],
+                    winner: null,
+                    createdAt: new Date(),
+                    giveawayNumber: newGiveawayNumber,
+                };
 
-        await Show.findByIdAndUpdate(
-            streamId,
-            { $set: { currentGiveaway: newActiveGiveaway } },
-            { new: true, runValidators: true, context: 'query' }
-        );
-        await Show.updateOne(
-            { _id: streamId, "giveawayProducts.productId": productToActivate.productId },
-            {
-                $set: {
-                    "giveawayProducts.$.isActive": true,
-                    "giveawayProducts.$.isGiveawayEnded": false,
-                    "giveawayProducts.$.applicants": [],
-                    "giveawayProducts.$.winner": null,
-                    "giveawayProducts.$.createdAt": newActiveGiveaway.createdAt,
-                    "giveawayProducts.$.giveawayNumber": newActiveGiveaway.giveawayNumber,
+                await Show.findByIdAndUpdate(
+                    streamId,
+                    { $set: { currentGiveaway: newActiveGiveaway } },
+                    { new: true, runValidators: true, context: 'query' }
+                );
+                await Show.updateOne(
+                    { _id: streamId, "giveawayProducts.productId": productToActivate.productId },
+                    {
+                        $set: {
+                            "giveawayProducts.$.isActive": true,
+                            "giveawayProducts.$.isGiveawayEnded": false,
+                            "giveawayProducts.$.isRolling": false, // New field
+                            "giveawayProducts.$.applicants": [],
+                            "giveawayProducts.$.winner": null,
+                            "giveawayProducts.$.createdAt": newActiveGiveaway.createdAt,
+                            "giveawayProducts.$.giveawayNumber": newActiveGiveaway.giveawayNumber,
+                        }
+                    }
+                );
+
+                const latestShow = await Show.findById(streamId).populate('currentGiveaway.productId');
+
+                if (!latestShow || !latestShow.currentGiveaway) {
+                    console.error("❌ Failed to fetch latest show with populated currentGiveaway after starting it.");
+                    return;
+                }
+
+                console.log("✅ Current giveaway set in show successfully:", latestShow.currentGiveaway.productTitle);
+
+                currentGiveawayByStream[streamId] = latestShow.currentGiveaway.toObject();
+                currentGiveawayByStream[streamId].productId = latestShow.currentGiveaway.productId;
+
+                io.emit('giveawayStarted', currentGiveawayByStream[streamId]); 
+
+            } catch (error) {
+                console.error("❌ Error starting giveaway:", error.message, error.stack);
+                if (error.name === 'VersionError') {
+                    socket.emit('giveawayError', { message: 'Failed to start giveaway due to a conflict. Please try again.' });
+                } else {
+                    socket.emit('giveawayError', { message: `Error starting giveaway: ${error.message}` });
                 }
             }
-        );
-
-        const latestShow = await Show.findById(streamId).populate('currentGiveaway.productId');
-
-        if (!latestShow || !latestShow.currentGiveaway) {
-             console.error("❌ Failed to fetch latest show with populated currentGiveaway after starting it.");
-             return;
-        }
-
-        console.log("✅ Current giveaway set in show successfully:", latestShow.currentGiveaway.productTitle);
-
-        currentGiveawayByStream[streamId] = latestShow.currentGiveaway.toObject();
-        currentGiveawayByStream[streamId].productId = latestShow.currentGiveaway.productId;
-
-        // Changed to io.emit
-        io.emit('giveawayStarted', currentGiveawayByStream[streamId]); 
-
-    } catch (error) {
-        console.error("❌ Error starting giveaway:", error.message, error.stack);
-        if (error.name === 'VersionError') {
-            socket.emit('giveawayError', { message: 'Failed to start giveaway due to a conflict. Please try again.' });
-        } else {
-            socket.emit('giveawayError', { message: `Error starting giveaway: ${error.message}` });
-        }
-    }
-});
-
+        });
 
 
         // --- Apply for Giveaway event. (Modified to use DB directly for state) ---
         socket.on('applyGiveaway', async ({ streamId, productId, user }) => {
             const userId = user._id.toString();
             console.log(`📢 User ${user.userName || user.name} applied for giveaway ${productId} in stream ${streamId}`);
-            console.log("receving data from apply from front end", { streamId, productId, userId });   
+            console.log("receving data from apply from front end", { streamId, productId, userId }); 
             try {
                 // Fetch the show document to get the current state and prevent race conditions
                 const show = await Show.findById(streamId);
@@ -742,7 +742,7 @@ export const initializeSocket = (server) => {
                     socket.emit('giveawayError', { message: 'Failed to update giveaway application.' });
                     return;
                 }
-                
+
                 // Fetch the updated `currentGiveaway` from the database to send it back with populated product
                 const latestGiveaway = await Show.findById(streamId).select('currentGiveaway').populate('currentGiveaway.productId');
 
@@ -758,8 +758,6 @@ export const initializeSocket = (server) => {
                 // Update local in-memory cache
                 currentGiveawayByStream[streamId] = giveawayToEmit;
 
-                
-                // Emit updated applicants count to all clients
                 io.emit('giveawayApplicantsUpdated', giveawayToEmit);
                 console.log("Applicants count increse before emit", giveawayToEmit.applicants.length);
             } catch (error) {
@@ -769,156 +767,136 @@ export const initializeSocket = (server) => {
         });
 
         // --- Roll Giveaway event. (Modified to use DB directly for state) ---
-      socket.on('rollGiveaway', async ({ streamId, productId }) => {
-    // productId received from client is a string (e.g., '6834044abdc3cf3a225eccc9')
-    console.log(`🎲 Host rolling for giveaway winner of product ${productId} in stream: ${streamId}`);
+        socket.on('rollGiveaway', async ({ streamId, productId }) => {
+            console.log(`🎲 Host trying to roll for giveaway winner of product ${productId} in stream: ${streamId}`);
 
-    try {
-        // Step 1: Fetch the Show document and populate currentGiveaway.productId.
-        // This makes `activeGiveaway.productId` a full product object.
-        const show = await Show.findById(streamId).populate('currentGiveaway.productId');
+            try {
+                const show = await Show.findById(streamId).populate('currentGiveaway.productId');
 
-        if (!show) {
-            console.error("❌ Roll Giveaway: Show not found for ID:", streamId);
-            socket.emit('giveawayRollRejected', { message: 'Show not found.' });
-            return;
-        }
+                if (!show) {
+                    console.error("❌ Roll Giveaway: Show not found for ID:", streamId);
+                    socket.emit('giveawayRollRejected', { message: 'Show not found.' });
+                    return;
+                }
 
-        let activeGiveaway = show.currentGiveaway;
+                let activeGiveaway = show.currentGiveaway;
 
-        // --- Start Debugging Logs ---
-        console.log("--- Roll Giveaway Debugging ---");
-        console.log("Client Stream ID:", streamId);
-        console.log("Client Product ID:", productId);
-        console.log("Fetched Show _id:", show._id ? show._id.toString() : 'N/A');
-        console.log("Show.currentGiveaway (raw):", activeGiveaway ? JSON.stringify(activeGiveaway.toObject(), null, 2) : 'NULL');
-        
-        if (activeGiveaway && activeGiveaway.productId) {
-            console.log("activeGiveaway.isActive (DB):", activeGiveaway.isActive);
-            console.log("activeGiveaway.isGiveawayEnded (DB):", activeGiveaway.isGiveawayEnded);
-            console.log("activeGiveaway.productId._id (DB):", activeGiveaway.productId._id ? activeGiveaway.productId._id.toString() : 'N/A');
-            console.log("Comparison (DB Product ID === Client Product ID):", 
-                        activeGiveaway.productId._id && activeGiveaway.productId._id.toString() === productId);
-        } else if (activeGiveaway) {
-            console.log("activeGiveaway.productId is missing or not populated correctly.");
-        } else {
-            console.log("activeGiveaway is NULL or UNDEFINED.");
-        }
-        console.log("--- End Roll Giveaway Debugging ---");
-        // --- End Debugging Logs ---
+                // Validate the active giveaway state
+                if (!activeGiveaway || !activeGiveaway.isActive || activeGiveaway.isGiveawayEnded || activeGiveaway.isRolling) {
+                    console.error("❌ Roll Giveaway: No current active giveaway found, or it's already ended/rolling.");
+                    socket.emit('giveawayRollRejected', { message: 'No active giveaway to roll, or it\'s already rolling/ended.' });
+                    return;
+                }
 
+                if (!activeGiveaway.productId || activeGiveaway.productId._id.toString() !== productId) {
+                    console.error(`❌ Roll Giveaway: Product ID mismatch. Expected ${activeGiveaway.productId ? activeGiveaway.productId._id.toString() : 'N/A'}, got ${productId}.`);
+                    socket.emit('giveawayRollRejected', { message: 'Product ID mismatch for active giveaway.' });
+                    return;
+                }
 
-        // Step 2: Validate the active giveaway state
-        if (!activeGiveaway) {
-            console.error("❌ Roll Giveaway: No current active giveaway found.");
-            socket.emit('giveawayRollRejected', { message: 'No active giveaway to roll. It might have ended or not started.' });
-            return;
-        }
-        
-        if (!activeGiveaway.isActive) {
-            console.error("❌ Roll Giveaway: Current giveaway is not active.");
-            socket.emit('giveawayRollRejected', { message: 'Current giveaway is not active.' });
-            return;
-        }
-        
-        if (activeGiveaway.isGiveawayEnded) {
-            console.error("❌ Roll Giveaway: Current giveaway has already ended.");
-            socket.emit('giveawayRollRejected', { message: 'Current giveaway has already ended.' });
-            return;
-        }
-        
-        // **FIX:** Access the `_id` property of the populated `productId` object for comparison.
-        if (!activeGiveaway.productId || activeGiveaway.productId._id.toString() !== productId) {
-            console.error(`❌ Roll Giveaway: Product ID mismatch. Expected ${activeGiveaway.productId ? activeGiveaway.productId._id.toString() : 'N/A'}, got ${productId}.`);
-            socket.emit('giveawayRollRejected', { message: 'Product ID mismatch for active giveaway.' });
-            return;
-        }
+                const applicants = activeGiveaway.applicants;
+                if (applicants.length === 0) {
+                    io.emit('noApplicants', { productId });
+                    socket.emit('giveawayRollRejected', { message: 'No applicants for this giveaway yet.' });
+                    return;
+                }
 
-        const applicants = activeGiveaway.applicants;
-        if (applicants.length === 0) {
-            io.emit('noApplicants', { productId });
-            socket.emit('giveawayRollRejected', { message: 'No applicants for this giveaway yet.' });
-            return;
-        }
+                // --- START ROLLING EFFECT ---
+                activeGiveaway.isRolling = true; // Set rolling state
+                await Show.findByIdAndUpdate(
+                    streamId,
+                    { $set: { "currentGiveaway.isRolling": true } },
+                    { new: true }
+                );
+                currentGiveawayByStream[streamId].isRolling = true; // Update local cache
 
-        // Step 3: Select a winner
-        const winnerIndex = Math.floor(Math.random() * applicants.length);
-        const winnerId = applicants[winnerIndex]; // This is a Mongoose ObjectId
-        
-        // Fetch full winner details for emitting to clients
-        const winnerUser = await User.findById(winnerId).lean(); // .lean() for plain JS object
+                // Emit to all clients that rolling has started
+                io.emit('giveawayRolling', { streamId, productId, applicants: activeGiveaway.applicants }); // Send applicants for frontend rolling effect
 
-        // Step 4: Update the `currentGiveaway` object in memory
-        activeGiveaway.winner = winnerId; // Store ObjectId reference
-        activeGiveaway.isActive = false;
-        activeGiveaway.isGiveawayEnded = true;
+                // Set a timeout for the 5-second rolling period
+                setTimeout(async () => {
+                    try {
+                        const winnerIndex = Math.floor(Math.random() * applicants.length);
+                        const winnerId = applicants[winnerIndex];
+                        const winnerUser = await User.findById(winnerId).lean();
 
-        // Step 5: Update the `giveawayProducts` array and clear `currentGiveaway` in the main Show document
-        const indexInGiveawayProducts = show.giveawayProducts.findIndex(
-            // Use the _id of the populated product for finding the correct entry
-            p => p.productId && p.productId._id && p.productId._id.toString() === activeGiveaway.productId._id.toString()
-        );
+                        // --- SELECT WINNER AND END GIVEAWAY ---
+                        const updatedShow = await Show.findById(streamId); // Re-fetch to ensure we have the latest document for update
+                        if (!updatedShow) {
+                            console.error("❌ Show not found during winner selection cleanup.");
+                            return;
+                        }
 
-        if (indexInGiveawayProducts !== -1) {
-            // Update the existing subdocument in giveawayProducts array with final state
-            Object.assign(show.giveawayProducts[indexInGiveawayProducts], {
-                winner: winnerId, // Store ObjectId reference
-                isActive: false,
-                isGiveawayEnded: true,
-                // Crucial: Persist the final applicants list to the historical record
-                applicants: activeGiveaway.applicants,
-                createdAt: activeGiveaway.createdAt, // Maintain original creation time
-                giveawayNumber: activeGiveaway.giveawayNumber
-            });
-        } else {
-            // This case should ideally not happen if `activeGiveaway` was successfully found
-            // and derived from `giveawayProducts` initially.
-            console.warn(`⚠️ Roll Giveaway: Could not find product ${activeGiveaway.productId._id} in giveawayProducts array for historical update.`);
-            // As a fallback, ensure a historical record is pushed if somehow missing (though current setup prevents this)
-            show.giveawayProducts.push({
-                productId: activeGiveaway.productId._id,
-                productOwnerSellerId: activeGiveaway.productOwnerSellerId,
-                productTitle: activeGiveaway.productTitle,
-                followersOnly: activeGiveaway.followersOnly,
-                isActive: false,
-                isGiveawayEnded: true,
-                applicants: activeGiveaway.applicants,
-                winner: winnerId,
-                createdAt: activeGiveaway.createdAt,
-                giveawayNumber: activeGiveaway.giveawayNumber
-            });
-        }
+                        let finalActiveGiveaway = updatedShow.currentGiveaway;
+                        if (!finalActiveGiveaway || finalActiveGiveaway.productId.toString() !== productId) {
+                             console.error("❌ Active giveaway changed or cleared unexpectedly during winner selection.");
+                             return;
+                        }
 
-        // Step 6: Clear the `currentGiveaway` field as it's no longer active
-        show.currentGiveaway = null; // Explicitly set to null to clear the active giveaway
+                        // Update the active giveaway for termination
+                        finalActiveGiveaway.winner = winnerId;
+                        finalActiveGiveaway.isActive = false;
+                        finalActiveGiveaway.isGiveawayEnded = true;
+                        finalActiveGiveaway.isRolling = false; // Rolling ends
 
-        // Step 7: Save the updated Show document to the database
-        await show.save();
-        console.log(`🏆 Winner selected: ${winnerUser?.name || winnerUser?.userName || winnerId} for product ${activeGiveaway.productTitle}. Current giveaway cleared.`);
+                        // Find and update the historical entry in giveawayProducts
+                        const indexInGiveawayProducts = updatedShow.giveawayProducts.findIndex(
+                            p => p.productId && p.productId.toString() === productId
+                        );
 
-        // Step 8: Clear local in-memory cache on the server instance
-        delete currentGiveawayByStream[streamId];
+                        if (indexInGiveawayProducts !== -1) {
+                            Object.assign(updatedShow.giveawayProducts[indexInGiveawayProducts], {
+                                winner: winnerId,
+                                isActive: false,
+                                isGiveawayEnded: true,
+                                isRolling: false, // Ensure this is also false in historical record
+                                applicants: finalActiveGiveaway.applicants, // Preserve final applicants list
+                            });
+                        } else {
+                            console.warn(`⚠️ Could not find product ${productId} in giveawayProducts array for historical update after rolling.`);
+                        }
 
-        // Step 9: Emit to all clients that a winner has been chosen and giveaway ended
-        io.emit('giveawayWinner', {
-            streamId,
-            productId: activeGiveaway.productId._id.toString(), // Send as string ID
-            winner: winnerUser, // Send populated winner user object
-            productTitle: activeGiveaway.productTitle, // Send product title for client toast
-            isGiveawayEnded: true,
+                        updatedShow.currentGiveaway = null; // Clear the active giveaway
+                        await updatedShow.save();
+                        console.log(`🏆 Winner selected: ${winnerUser?.name || winnerUser?.userName || winnerId} for product ${finalActiveGiveaway.productTitle}. Current giveaway cleared.`);
+
+                        delete currentGiveawayByStream[streamId]; // Clear local cache
+
+                        io.emit('giveawayWinner', {
+                            streamId,
+                            productId: productId, // Send as string ID
+                            winner: winnerUser, // Send populated winner user object
+                            productTitle: finalActiveGiveaway.productTitle,
+                            isGiveawayEnded: true,
+                        });
+
+                    } catch (error) {
+                        console.error("❌ Error during giveaway winner selection or update:", error.message, error.stack);
+                        // Attempt to revert isRolling if an error occurs during selection/save
+                        try {
+                            const failedShow = await Show.findById(streamId);
+                            if (failedShow && failedShow.currentGiveaway && failedShow.currentGiveaway.productId.toString() === productId) {
+                                failedShow.currentGiveaway.isRolling = false;
+                                await failedShow.save();
+                                currentGiveawayByStream[streamId].isRolling = false;
+                                io.to(streamId).emit('giveawayError', { message: 'Rolling failed, please try again.' });
+                            }
+                        } catch (revertError) {
+                            console.error("❌ Failed to revert isRolling state:", revertError);
+                        }
+                    }
+                }, 5000); // 5-second delay
+            } catch (error) {
+                console.error("❌ Critical Error in rollGiveaway (initial stage):", error.message, error.stack);
+                socket.emit('giveawayError', { message: `Error rolling winner: ${error.message}` });
+            }
         });
-
-    } catch (error) {
-        console.error("❌ Critical Error in rollGiveaway:", error.message, error.stack);
-        socket.emit('giveawayError', { message: `Error rolling winner: ${error.message}` });
-    }
-});
 
         // --- Manually end Giveaway event. (Modified to use DB directly for state) ---
         socket.on('endGiveawayManual', async ({ streamId, productId }) => {
             console.log(`🛑 Host manually ending giveaway for product: ${productId} in stream: ${streamId}`);
             try {
-                 const show = await Show.findById(streamId).populate('currentGiveaway.productId');
+                const show = await Show.findById(streamId).populate('currentGiveaway.productId');
                 if (!show) {
                     console.error("❌ Show not found:", streamId);
                     socket.emit('giveawayError', { message: 'Show not found.' });
@@ -935,9 +913,8 @@ export const initializeSocket = (server) => {
                 // Update status for manual end (no winner)
                 activeGiveaway.isActive = false;
                 activeGiveaway.isGiveawayEnded = true;
+                activeGiveaway.isRolling = false; // Ensure rolling is stopped
                 activeGiveaway.winner = null; // Ensure winner is null if manually ended
-                // Preserve applicants list for historical record if needed
-                // activeGiveaway.applicants is already correct from previous apply events.
 
                 // Find the index of the product in the main `giveawayProducts` array and update it
                 const indexInGiveawayProducts = show.giveawayProducts.findIndex(
@@ -948,6 +925,7 @@ export const initializeSocket = (server) => {
                     Object.assign(show.giveawayProducts[indexInGiveawayProducts], {
                         isActive: false,
                         isGiveawayEnded: true,
+                        isRolling: false, // Ensure this is also false
                         winner: null,
                         applicants: activeGiveaway.applicants, // Persist applicants to historical record
                         createdAt: activeGiveaway.createdAt, // Maintain original creation time
@@ -966,7 +944,7 @@ export const initializeSocket = (server) => {
                 io.emit('giveawayEndedManually', {
                     streamId,
                     productId: productId,
-                    productTitle: activeGiveaway.productTitle, // Send title for toast on client
+                    productTitle: activeGiveaway.productTitle,
                     message: `Giveaway for ${activeGiveaway.productTitle} has been cancelled by host.`
                 });
                 console.log(`✅ Giveaway for product ${productId} ended manually.`);

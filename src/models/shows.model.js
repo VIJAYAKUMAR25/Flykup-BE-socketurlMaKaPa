@@ -274,6 +274,7 @@ const showSchema = new Schema(
                 streamId: { type: String },
                 productTitle: { type: String },
                 followersOnly: { type: Boolean, default: false },
+                 isRolling: { type: Boolean, default: false },
                 isActive: { type: Boolean, default: false }, // Set to true when this giveaway is active
                 isGiveawayEnded: { type: Boolean, default: false }, // True when winner selected or manually ended
                 applicants: [{ type: mongoose.Schema.Types.ObjectId, ref: "users" }], // Store user IDs of applicants
